@@ -7,6 +7,47 @@ const explosionSound = new Audio('assets/sounds/explosion.mp3');
 backgroundMusic.loop = true;
 backgroundMusic.volume = 0.3;
 
+// Game state variables
+let gameInitialized = false;
+let gameStarted = false;
+let gameRunning = true;
+let waitingForStart = true;
+let score = 0;
+let particles = [];
+let matches = [];
+
+// Welcome screen elements
+const welcomeScreen = document.getElementById('welcomeScreen');
+const startPrompt = document.getElementById('startPrompt');
+
+// Game constants
+const GRAVITY = 0.5;
+const FLAP_SPEED = -8;
+const MATCH_SPEED = 2;
+const MATCH_SPAWN_INTERVAL = 2000;
+const MATCH_GAP = 200;
+const MIN_MATCH_SPACING = 200;
+
+// Colors
+const colors = {
+    flame: ['#ff4d00', '#ffd700', '#ff8c00'],
+    sparkle: ['#ffd700', '#ff4d00', '#ffffff'],
+    background: '#000033'
+};
+
+// Bomb object
+const bomb = {
+    x: 50,
+    y: canvas.height / 2,
+    velocity: 0,
+    radius: 15,
+    rotation: 0,
+    isExploding: false,
+    explosionRadius: 0,
+    explosionAlpha: 1,
+    sparkTrail: []
+};
+
 // Audio functions
 function startBackgroundMusic() {
     backgroundMusic.play().catch(error => console.log("Audio play failed:", error));
@@ -42,15 +83,7 @@ function resizeCanvas() {
     canvas.style.height = (canvas.height * scale) + 'px';
 }
 
-// Game constants
-const GRAVITY = 0.5;
-const FLAP_SPEED = -8;
-const MATCH_SPEED = 2;
-const MATCH_SPAWN_INTERVAL = 2000;
-const MATCH_GAP = 200;
-const MIN_MATCH_SPACING = 200;
-
-// Particle system for sparkles
+// Particle system
 class Particle {
     constructor(x, y) {
         this.x = x;
@@ -79,35 +112,7 @@ class Particle {
     }
 }
 
-// Sparkle effect system
-let particles = [];
-
-// Bomb properties
-const bomb = {
-    x: 50,
-    y: canvas.height / 2,
-    velocity: 0,
-    radius: 15,
-    rotation: 0,
-    isExploding: false,
-    explosionRadius: 0,
-    explosionAlpha: 1,
-    sparkTrail: []
-};
-
-// Game state
-let matches = [];
-let score = 0;
-let gameRunning = true;
-let gameStarted = false;
-
-// Colors
-const colors = {
-    flame: ['#ff4d00', '#ffd700', '#ff8c00'],
-    sparkle: ['#ffd700', '#ff4d00', '#ffffff'],
-    background: '#000033'
-};
-
+// Game mechanics functions
 function createMatch() {
     if (matches.length > 0) {
         const lastMatch = matches[matches.length - 1];
@@ -140,7 +145,6 @@ function drawBackground() {
         const y = Math.random() * canvas.height;
         const size = Math.random() * 2;
         const brightness = Math.random();
-        
         ctx.fillStyle = `rgba(255, 255, 255, ${brightness})`;
         ctx.beginPath();
         ctx.arc(x, y, size, 0, Math.PI * 2);
@@ -169,10 +173,11 @@ function drawBomb() {
         ctx.save();
         ctx.translate(bomb.x, bomb.y);
         ctx.rotate(bomb.rotation);
-
+        
         const bombGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, bomb.radius);
         bombGradient.addColorStop(0, '#666');
         bombGradient.addColorStop(1, '#333');
+        
         ctx.fillStyle = bombGradient;
         ctx.beginPath();
         ctx.arc(0, 0, bomb.radius, 0, Math.PI * 2);
@@ -189,10 +194,10 @@ function drawBomb() {
         ctx.beginPath();
         ctx.arc(20, -bomb.radius - 5, 3, 0, Math.PI * 2);
         ctx.fill();
-
         ctx.shadowColor = '#ff4d00';
         ctx.shadowBlur = 10;
         ctx.fill();
+        
         ctx.restore();
     }
 }
@@ -201,7 +206,7 @@ function drawMatch(match) {
     ctx.fillStyle = '#8b4513';
     ctx.fillRect(match.x, 0, match.width, match.topHeight);
     ctx.fillRect(match.x, match.topHeight + MATCH_GAP, match.width, canvas.height);
-
+    
     drawFlame(match.x + match.width/2, match.topHeight, match.flameSize, match.flameAlpha);
     drawFlame(
         match.x + match.width/2,
@@ -234,8 +239,43 @@ function drawFlame(x, y, size, alpha) {
     ctx.restore();
 }
 
+function drawGameOverScreen() {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.textAlign = 'center';
+    
+    ctx.fillStyle = '#ffd700';
+    ctx.font = '30px Arial';
+    ctx.fillText(`Final Score: ${score}`, canvas.width/2, 100);
+    
+    ctx.font = 'bold 40px Arial';
+    ctx.shadowColor = '#ff4d00';
+    ctx.shadowBlur = 20;
+    for(let i = 0; i < 5; i++) {
+        ctx.fillStyle = `rgba(255, 215, 0, ${1 - i * 0.2})`;
+        ctx.fillText('Happy Diwali', canvas.width/2, canvas.height/2 - 40 + i);
+    }
+    
+    ctx.font = '20px Arial';
+    ctx.fillStyle = '#ff8c00';
+    ctx.shadowBlur = 10;
+    ctx.fillText('By Gaurav Upadhyay', canvas.width/2, canvas.height/2 + 20);
+    
+    ctx.font = '16px Arial';
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowBlur = 5;
+    ctx.fillText('Press Space or Tap to restart', canvas.width/2, canvas.height/2 + 60);
+}
+
 function update() {
-    if (!gameRunning) return;
+    if (!gameRunning || !gameStarted) return;
+    
+    if (waitingForStart) {
+        bomb.y = canvas.height / 2;
+        bomb.velocity = 0;
+        bomb.rotation = 0;
+        return;
+    }
 
     bomb.velocity += GRAVITY;
     bomb.y += bomb.velocity;
@@ -269,8 +309,6 @@ function update() {
                 (bomb.y - hitBox < match.topHeight || 
                 bomb.y + hitBox > match.topHeight + MATCH_GAP)) {
                 bomb.isExploding = true;
-                bomb.explosionRadius = 0;
-                bomb.explosionAlpha = 1;
                 playExplosionSound();
             }
         }
@@ -285,6 +323,7 @@ function update() {
 
     if (bomb.y > canvas.height || bomb.y < 0) {
         bomb.isExploding = true;
+        playExplosionSound();
     }
 }
 
@@ -310,34 +349,6 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
-function drawGameOverScreen() {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    ctx.textAlign = 'center';
-    
-    ctx.fillStyle = '#ffd700';
-    ctx.font = '30px Arial';
-    ctx.fillText(`Final Score: ${score}`, canvas.width/2, 100);
-    
-    ctx.font = 'bold 40px Arial';
-    ctx.shadowColor = '#ff4d00';
-    ctx.shadowBlur = 20;
-    for(let i = 0; i < 5; i++) {
-        ctx.fillStyle = `rgba(255, 215, 0, ${1 - i * 0.2})`;
-        ctx.fillText('Happy Diwali', canvas.width/2, canvas.height/2 - 40 + i);
-    }
-    
-    ctx.font = '20px Arial';
-    ctx.fillStyle = '#ff8c00';
-    ctx.shadowBlur = 10;
-    ctx.fillText('By Gaurav Upadhyay', canvas.width/2, canvas.height/2 + 20);
-    
-    ctx.font = '16px Arial';
-    ctx.fillStyle = '#ffffff';
-    ctx.shadowBlur = 5;
-    ctx.fillText('Press Space or Tap to restart', canvas.width/2, canvas.height/2 + 60);
-}
 function resetGame() {
     bomb.y = canvas.height / 2;
     bomb.velocity = 0;
@@ -348,12 +359,19 @@ function resetGame() {
     particles = [];
     score = 0;
     gameRunning = true;
+    waitingForStart = true;
+    startPrompt.classList.remove('hidden');
     startBackgroundMusic();
 }
 
 // Event Listeners
 document.addEventListener('keydown', (e) => {
     if (e.code === 'Space') {
+        if (waitingForStart) {
+            waitingForStart = false;
+            startPrompt.classList.add('hidden');
+            return;
+        }
         if (gameRunning && !bomb.isExploding) {
             bomb.velocity = FLAP_SPEED;
             if (backgroundMusic.paused) {
@@ -365,9 +383,15 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-document.getElementById('jumpButton').addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    if (gameRunning && !bomb.isExploding) {
+document.addEventListener('touchstart', (e) => {
+    if (waitingForStart) {
+        waitingForStart = false;
+        startPrompt.classList.add('hidden');
+        return;
+    }
+    if (!gameRunning) {
+        resetGame();
+    } else if (!bomb.isExploding) {
         bomb.velocity = FLAP_SPEED;
         if (backgroundMusic.paused) {
             startBackgroundMusic();
@@ -375,21 +399,27 @@ document.getElementById('jumpButton').addEventListener('touchstart', (e) => {
     }
 });
 
-
-document.addEventListener('touchstart', (e) => {
-    if (!gameRunning) {
-        resetGame();
-    }
+// Welcome screen handler
+welcomeScreen.addEventListener('click', () => {
+    welcomeScreen.style.display = 'none';
+    gameStarted = true;
+    waitingForStart = true;
+    startPrompt.classList.remove('hidden');
 });
 
 // Initialize game
 window.addEventListener('load', () => {
+    canvas.width = 400;
+    canvas.height = 600;
     resizeCanvas();
     initAudio();
     setInterval(() => {
-        if (gameRunning && !bomb.isExploding) createMatch();
+        if (gameRunning && !bomb.isExploding && gameStarted && !waitingForStart) {
+            createMatch();
+        }
     }, MATCH_SPAWN_INTERVAL);
     gameLoop();
 });
 
+// Handle window resize
 window.addEventListener('resize', resizeCanvas);

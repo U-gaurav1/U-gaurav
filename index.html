@@ -1,16 +1,59 @@
+
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>Diwali Bomb Game</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <canvas id="gameCanvas" width="288" height="512"></canvas>
-    <div id="controls">
-        <button class="game-button" id="jumpButton">JUMP</button>
+    <div id="welcomeScreen" class="welcome-screen">
+        <div class="welcome-content">
+            <div class="welcome-header">
+                <h1>🪔 Happy Diwali! 🪔</h1>
+                <div class="festival-text">Light up the sky with your bomb-flying skills!</div>
+            </div>
+            <div class="rules">
+                <h2>Game Instructions:</h2>
+                <ul>
+                    <li>Tap or press SPACE to make the bomb fly</li>
+                    <li>Avoid hitting the matches and fiery borders</li>
+                    <li>Score points by passing through matches</li>
+                    <li>Stay alive as long as possible!</li>
+                </ul>
+            </div>
+            <div class="tap-to-continue">Tap anywhere to start your Diwali adventure!</div>
+        </div>
     </div>
+
+    <div id="startPrompt" class="start-prompt hidden">
+        Tap To Start
+    </div>
+
+    <div class="game-container">
+        <canvas id="gameCanvas" width="288" height="512"></canvas>
+       
+       
+        <div id="controls">
+            <button class="game-button" id="jumpButton">JUMP</button>
+        </div>
+        
+        <div class="score-display" id="scoreDisplay">
+            Score: <span id="score">0</span>
+        </div>
+    </div>
+
+    <div class="sound-control">
+        <button id="muteButton" class="control-button">
+            🔊
+        </button>
+    </div>
+
+    <div class="signature">
+        Made with ❤️ By GauravU
+    </div>
+
     <script src="js/game.js"></script>
-<div class="signature">Made By GauravU</div>
 </body>
 </html>
